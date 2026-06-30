@@ -18,6 +18,7 @@ As quantum state spaces scale exponentially O(2^N), traditional single-node CPU 
 
 cudaq-performance-benchmarking/
 ├── benchmarks/
+
 │   ├── hybrid_scaling_test.py   # Core CLI execution and JSON data logging
 │   └── plot_results.py          # Decoupled visualization generation
 ├── data/
