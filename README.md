@@ -52,6 +52,7 @@ The benchmarking suite evaluates state-vector tracking from 4 to 16 qubits using
 ### Option 1: Containerized Deployment (Recommended)
 Avoid local dependency conflicts by running the suite via the official NVIDIA CUDA-Q Docker image. Ensure your host system has the NVIDIA Container Toolkit installed.
 
+```bash
 # 1. Build the image
 docker build -t cudaq-bench .
 
@@ -60,10 +61,12 @@ docker run --gpus all -v $(pwd)/data:/app/data cudaq-bench
 
 # 3. Generate the visualization locally
 python benchmarks/plot_results.py
+```
 
 ### Option 2: Local Python Environment
 If running natively, provision an environment with access to an active NVIDIA GPU runtime.
-
+'''
+```bash
 # 1. Install dependencies
 pip install cudaq matplotlib
 
@@ -72,6 +75,7 @@ python benchmarks/hybrid_scaling_test.py --min-qubits 4 --max-qubits 16 --step 2
 
 # 3. Generate the performance graph
 python benchmarks/plot_results.py
+```
 
 ## Future Work
 - **Noise Modeling:** Implement cudaq.NoiseModel to benchmark the performance hit of simulating decoherence.
