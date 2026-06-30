@@ -14,16 +14,15 @@ def run_benchmark(target: str, min_q: int, max_q: int, step: int, shots: int):
     cudaq.set_target(target)
     
     # --- WARM-UP ROUND ---
-    # Warmed up dynamically with the exact starting qubit count 
-    # to properly clear JIT compilation overhead for that specific memory size.
     cudaq.sample(test_circuit, min_q, shots_count=10)
     
     latencies = {}
     for n in range(min_q, max_q + 1, step):
         print(f"Running target [{target}] at scale: {n} qubits...")
-        t_start = time.time()
+        # High-resolution hardware clock for sub-microsecond GPU timing
+        t_start = time.perf_counter()
         cudaq.sample(test_circuit, n, shots_count=shots)
-        elapsed = time.time() - t_start
+        elapsed = time.perf_counter() - t_start
         latencies[n] = elapsed
         
     return latencies
