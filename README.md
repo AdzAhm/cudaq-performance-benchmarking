@@ -12,13 +12,11 @@ This project benchmarks the performance characteristics of simulating multi-qubi
 
 **Note:** This project performs *Quantum Emulation* on classical hardware (NVIDIA GPU/x86 CPU). It does not execute on a physical QPU.
 
-As quantum state spaces scale exponentially O(2^N), traditional single-node CPU architectures face a steep computational wall. This suite models that breakdown and demonstrates how GPU-parallelized engines mitigate the scaling bottleneck. The repository is built with a modular, production-ready architecture featuring automated data logging, separated visualization pipelines, and containerized deployment.
+As quantum state spaces scale exponentially O(N^2), traditional single-node CPU architectures face a steep computational wall. This suite models that breakdown and demonstrates how GPU-parallelized engines mitigate the scaling bottleneck. The repository is built with a modular, production-ready architecture featuring automated data logging, separated visualization pipelines, and containerized deployment.
 
-## Repository Architecture
-
+```text
 cudaq-performance-benchmarking/
 ├── benchmarks/
-
 │   ├── hybrid_scaling_test.py   # Core CLI execution and JSON data logging
 │   └── plot_results.py          # Decoupled visualization generation
 ├── data/
@@ -26,8 +24,9 @@ cudaq-performance-benchmarking/
 ├── reports/
 │   └── benchmark_chart.png      # Generated log-scale performance artifact
 ├── Dockerfile                   # Environment provisioning (NVIDIA base image)
+├── LICENSE
 └── README.md
-
+```
 ## Architectural Metrics & Analysis
 The benchmarking suite evaluates state-vector tracking from 4 to 16 qubits using 500 execution shots per scale sequence. To ensure scientific rigor, a JIT-compilation "warm-up" circuit is executed prior to the benchmarking loop to prevent driver initialization overhead from skewing latency metrics.
 
