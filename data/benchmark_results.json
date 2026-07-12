@@ -1,4 +1,9 @@
 {
+    "metadata": {
+        "shots": 500,
+        "evolution_only": false,
+        "timestamp": 1720807200.0
+    },
     "results": {
         "cpu_qpp": {
             "4": 0.01759515300000203,
