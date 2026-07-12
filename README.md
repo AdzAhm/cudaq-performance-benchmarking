@@ -47,12 +47,11 @@ By default, this suite benchmarks the full sampling pipeline. If your goal is st
 ### Noise Modeling
 You can introduce a Depolarizing Channel to simulate the decoherence inherent in NISQ devices. Setting `noise_probability: 0.01` (or any positive value) in the `config.yaml` applies noise across all gates. Noise simulation forces density matrix tracking or stochastic sampling, vastly increasing the computational complexity.
 
-### Performance Artifacts
-**GHZ Circuit Scaling**
-![Performance Scaling Analysis - GHZ](./reports/benchmark_chart_ghz.png)
+### Interactive Streamlit Dashboard
+Instead of generating static PNG charts, this suite now features a fully interactive web dashboard built with **Streamlit**. You can dynamically filter targets, select quantum circuits, and visualize performance bottlenecks right in your browser.
 
-**HEA Circuit Scaling**
-![Performance Scaling Analysis - HEA](./reports/benchmark_chart_hea.png)
+### Precision Scaling (`float32` vs `float64`)
+By default, CUDA-Q and the benchmark suite execute with **Double Precision (`float64`)**. You can configure the suite to evaluate **Single Precision (`float32`)** by changing the `precision` key in `config.yaml`. Single precision cuts the memory bandwidth and footprint in half, which drastically alters the GPU scaling curve and delays the VRAM saturation point for extremely large qubit counts.
 
 ### Key Observations
 1. **The Initialization Tax:** At a low qubit volume (N=4), the classical CPU engine outperforms the GPU pipeline. This highlights the memory allocation, kernel JIT compilation, and PCIe bus transfer overhead native to heterogeneous computing.
@@ -84,8 +83,8 @@ docker run --gpus all -v $(pwd)/data:/app/data -v $(pwd)/reports:/app/reports cu
 # 3. Distributed Scaling (Multi-GPU via MPI)
 docker run --gpus all -v $(pwd)/data:/app/data -v $(pwd)/reports:/app/reports cudaq-bench mpirun -np 2 python3 benchmarks/hybrid_scaling_test.py
 
-# 4. Generate the visualization locally
-python benchmarks/plot_results.py
+# 4. Launch the Interactive Web Dashboard
+docker run -p 8501:8501 -v $(pwd)/data:/app/data cudaq-bench streamlit run dashboard/app.py
 ```
 
 ### Option 2: Local Python Environment

@@ -11,5 +11,6 @@ benchmarks:
     - ghz
     - hea
   noise_probability: 0.0
+  precision: "float64"
   evolution_only: false
   output_file: "data/benchmark_results.json"

@@ -17,21 +17,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python packages without cache to reduce image bloat
-# PyYAML is added for the new configuration file
+# PyYAML is added for the new configuration file. Streamlit added for Dashboard.
 RUN python3 -m pip install --no-cache-dir \
     cudaq \
     matplotlib \
-    pyyaml
+    pyyaml \
+    streamlit \
+    pandas
 
 # Create non-root user for security best practices
 RUN useradd -m -u 1000 benchmark_user
 
 # Explicitly create directories with correct ownership before copying
-RUN mkdir -p /app/data /app/reports && chown -R benchmark_user:benchmark_user /app
+RUN mkdir -p /app/data /app/reports /app/dashboard && chown -R benchmark_user:benchmark_user /app
+
+# Expose Streamlit port
+EXPOSE 8501
 
 # Copy necessary application files with proper ownership
 COPY --chown=benchmark_user:benchmark_user config.yaml /app/config.yaml
 COPY --chown=benchmark_user:benchmark_user benchmarks/ /app/benchmarks/
+COPY --chown=benchmark_user:benchmark_user dashboard/ /app/dashboard/
 # We don't copy data/ or reports/ locally because they are meant for output, and we already created them with correct permissions above.
 
 USER benchmark_user

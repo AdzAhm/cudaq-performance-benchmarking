@@ -76,6 +76,7 @@ if __name__ == "__main__":
     parser.add_argument("--max-qubits", type=int, help="Maximum qubit count")
     parser.add_argument("--step", type=int, help="Step size")
     parser.add_argument("--shots", type=int, help="Measurement shots per trial")
+    parser.add_argument("--precision", type=str, choices=["float32", "float64"], help="Simulation precision")
     parser.add_argument("--evolution-only", action='store_true', help="Benchmark state vector evolution only")
     parser.add_argument("--output", type=str, help="Path to save results")
     args = parser.parse_args()
@@ -91,7 +92,12 @@ if __name__ == "__main__":
     targets = config.get('targets', ["qpp-cpu", "nvidia"])
     circuits = config.get('circuits', ["ghz"])
     noise_prob = config.get('noise_probability', 0.0)
+    precision = args.precision if args.precision else config.get('precision', "float64")
 
+    # Inform the user about precision limitations in pure Python environment
+    if precision == "float32":
+        os.environ["CUDAQ_FP32"] = "1"
+        
     # MPI Rank logic
     rank = cudaq.mpi.rank() if cudaq.mpi.is_initialized() else 0
 
@@ -110,6 +116,7 @@ if __name__ == "__main__":
             print(f"Mode: Full Sampling with Noise (prob={noise_prob}). evolution_only flag ignored.")
         else:
             print(f"Mode: {'Evolution Only (get_state)' if evolution_only else 'Full Sampling (sample)'}")
+        print(f"Precision configured to: {precision}")
     
     all_results = {}
     for target in targets:
@@ -129,6 +136,7 @@ if __name__ == "__main__":
                 "shots": shots, 
                 "evolution_only": evolution_only,
                 "noise_probability": noise_prob,
+                "precision": precision,
                 "timestamp": time.time()
             },
             "results": all_results

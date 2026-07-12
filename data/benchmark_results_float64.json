@@ -3,6 +3,7 @@
         "shots": 500,
         "evolution_only": false,
         "noise_probability": 0.0,
+        "precision": "float64",
         "timestamp": 1720807200.0
     },
     "results": {
