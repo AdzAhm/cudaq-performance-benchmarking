@@ -1,0 +1,16 @@
+benchmarks:
+  min_qubits: 4
+  max_qubits: 18
+  step: 2
+  shots: 500
+  targets:
+    - qpp-cpu
+    - nvidia
+    - nvidia-mqpu
+  circuits:
+    - ghz
+    - hea
+  noise_probability: 0.0
+  precision: "float64"
+  evolution_only: false
+  output_file: "data/benchmark_results.json"

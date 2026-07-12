@@ -8,7 +8,7 @@
 A comparative performance analysis evaluating execution latency scaling across classical CPU execution architectures versus hardware-accelerated GPU pipelines using the **NVIDIA CUDA-Q** framework.
 
 ## Project Overview
-This project benchmarks the performance characteristics of simulating multi-qubit maximally entangled states (GHZ states) under varying hardware backends. 
+This project benchmarks the performance characteristics of simulating multi-qubit states under varying hardware backends. 
 
 **Note:** This project performs *Quantum Emulation* on classical hardware (NVIDIA GPU/x86 CPU). It does not execute on a physical QPU.
 
@@ -24,25 +24,55 @@ cudaq-performance-benchmarking/
 ├── reports/
 │   └── benchmark_chart.png      # Generated log-scale performance artifact
 ├── Dockerfile                   # Environment provisioning (NVIDIA base image)
+├── config.yaml                  # Configuration file for benchmarking tests
 ├── LICENSE
 └── README.md
 ```
-## Architectural Metrics & Analysis
-The benchmarking suite evaluates state-vector tracking from 4 to 16 qubits using 500 execution shots per scale sequence. To ensure scientific rigor, a JIT-compilation "warm-up" circuit is executed prior to the benchmarking loop to prevent driver initialization overhead from skewing latency metrics.
 
-### Performance Artifact
-![Performance Scaling Analysis](./reports/benchmark_chart.png)
+## Architectural Metrics & Analysis
+The benchmarking suite evaluates state-vector tracking from 4 to 18 qubits using 500 execution shots per scale sequence. To ensure scientific rigor, a JIT-compilation "warm-up" circuit is executed prior to the benchmarking loop to prevent driver initialization overhead from skewing latency metrics.
+
+### Benchmarked Circuits
+The suite now dynamically tests multiple circuit architectures to evaluate workload diversity:
+1. **GHZ State:** A highly entangled sequence acting as a baseline metric.
+2. **Hardware Efficient Ansatz (HEA):** A parameterized circuit heavily used in Variational Quantum Eigensolvers (VQE) and QAOA, consisting of dense single-qubit rotations (`RX`, `RZ`) followed by entangling `CX` layers.
+
+### Measurement Overhead vs State Vector Evolution
+In a state-vector simulator, calling a sampling function (like `cudaq.sample`) performs two expensive tasks: 
+1. **State Vector Evolution:** Multiplying the state vector by the quantum gates.
+2. **Measurement Overhead:** Collapsing the computed wavefunction into a probability distribution and drawing samples from it.
+
+By default, this suite benchmarks the full sampling pipeline. If your goal is strictly benchmarking the computational limit of simulating gates, you can use the `--evolution-only` flag to isolate the raw matrix multiplication speed using `cudaq.get_state()`. Note: This flag is incompatible with noise modeling.
+
+### Noise Modeling
+You can introduce a Depolarizing Channel to simulate the decoherence inherent in NISQ devices. Setting `noise_probability: 0.01` (or any positive value) in the `config.yaml` applies noise across all gates. Noise simulation forces density matrix tracking or stochastic sampling, vastly increasing the computational complexity.
+
+### Interactive Streamlit Dashboard
+Instead of generating static PNG charts, this suite now features a fully interactive web dashboard built with **Streamlit**. You can dynamically filter targets, select quantum circuits, and visualize performance bottlenecks right in your browser.
+
+### Performance Artifacts (Static)
+While the web dashboard provides the best experience, the static charts generated from the baseline precision are included below:
+
+**GHZ Circuit Scaling**
+![Performance Scaling Analysis - GHZ](./reports/benchmark_chart_ghz.png)
+
+**HEA Circuit Scaling**
+![Performance Scaling Analysis - HEA](./reports/benchmark_chart_hea.png)
+
+### Precision Scaling (`float32` vs `float64`)
+By default, CUDA-Q and the benchmark suite execute with **Double Precision (`float64`)**. You can configure the suite to evaluate **Single Precision (`float32`)** by changing the `precision` key in `config.yaml`. Single precision cuts the memory bandwidth and footprint in half, which drastically alters the GPU scaling curve and delays the VRAM saturation point for extremely large qubit counts.
 
 ### Key Observations
 1. **The Initialization Tax:** At a low qubit volume (N=4), the classical CPU engine outperforms the GPU pipeline. This highlights the memory allocation, kernel JIT compilation, and PCIe bus transfer overhead native to heterogeneous computing.
 2. **The Efficiency Crossover:** Between 8 and 10 qubits, the computational density amortizes the initialization latency, making GPU acceleration highly efficient.
 3. **Exponential Classical Degradation:** Beyond 12 qubits, the CPU execution latency scales vertically due to the exponential growth of the underlying complex state vectors.
-4. **Massive Parallel Throughput:** The NVIDIA GPU pipeline maintains near-flat execution latency up to 16 qubits, leveraging dense thread arrays to compute matrix transformations simultaneously without hitting VRAM bottlenecks.
+4. **Massive Parallel Throughput:** The NVIDIA GPU pipeline maintains near-flat execution latency up to 18 qubits, leveraging dense thread arrays to compute matrix transformations simultaneously without hitting VRAM bottlenecks.
 
 ## Technical Toolchain
 * **Framework:** NVIDIA CUDA-Q
 * **Hardware Acceleration Engine:** NVIDIA T4 GPU (via cuStateVec)
 * **Classical Simulation Target:** qpp-cpu (OpenMP-accelerated host simulator)
+* **Distributed Target:** nvidia-mqpu (MPI-based Multi-GPU orchestration)
 * **Data Pipeline:** JSON Structured Logging / Matplotlib
 
 ---
@@ -50,37 +80,38 @@ The benchmarking suite evaluates state-vector tracking from 4 to 16 qubits using
 ## How to Run
 
 ### Option 1: Containerized Deployment (Recommended)
-Avoid local dependency conflicts by running the suite via the official NVIDIA CUDA-Q Docker image. Ensure your host system has the NVIDIA Container Toolkit installed.
+Avoid local dependency conflicts by running the suite via Docker. Ensure your host system has the NVIDIA Container Toolkit installed. The container securely uses a non-root user, maps permissions automatically, and pre-installs OpenMPI for multi-GPU scaling.
 
 ```bash
 # 1. Build the image
 docker build -t cudaq-bench .
 
-# 2. Run the benchmarking suite (mounts the data folder to save results locally)
-docker run --gpus all -v $(pwd)/data:/app/data cudaq-bench
+# 2. Run the benchmarking suite standard
+docker run --gpus all -v $(pwd)/data:/app/data -v $(pwd)/reports:/app/reports cudaq-bench
 
-# 3. Generate the visualization locally
-python benchmarks/plot_results.py
+# 3. Distributed Scaling (Multi-GPU via MPI)
+docker run --gpus all -v $(pwd)/data:/app/data -v $(pwd)/reports:/app/reports cudaq-bench mpirun -np 2 python3 benchmarks/hybrid_scaling_test.py
+
+# 4. Launch the Interactive Web Dashboard
+docker run -p 8501:8501 -v $(pwd)/data:/app/data cudaq-bench streamlit run dashboard/app.py
 ```
 
 ### Option 2: Local Python Environment
-If running natively, provision an environment with access to an active NVIDIA GPU runtime.
-'''
+If running natively, provision an environment with access to an active NVIDIA GPU runtime and OpenMPI.
+
 ```bash
 # 1. Install dependencies
-pip install cudaq matplotlib
+pip install cudaq matplotlib pyyaml
 
-# 2. Execute the core benchmarking pipeline (supports dynamic CLI arguments)
-python benchmarks/hybrid_scaling_test.py --min-qubits 4 --max-qubits 16 --step 2 --shots 500
+# 2. Execute the core benchmarking pipeline using config.yaml defaults
+python benchmarks/hybrid_scaling_test.py 
 
-# 3. Generate the performance graph
+# 3. (Optional) Run with MPI for Multi-GPU distribution
+mpirun -np 2 python benchmarks/hybrid_scaling_test.py
+
+# 4. Generate the performance graph
 python benchmarks/plot_results.py
 ```
-
-## Future Work
-- **Noise Modeling:** Implement cudaq.NoiseModel to benchmark the performance hit of simulating decoherence.
-- **Circuit Diversity:** Expand beyond GHZ states to include Random Quantum Circuits (RQCs) and QAOA.
-- **Distributed Scaling:** Extend the suite to support multi-GPU MPI-based orchestration.
 
 ## License
 Distributed under the MIT License. See LICENSE for more information.
