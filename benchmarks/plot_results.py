@@ -36,20 +36,24 @@ def main():
     if not common_qubits:
         raise ValueError("No overlapping qubit counts between targets")
 
-    plt.figure(figsize=(9, 5))
+    plt.figure(figsize=(10, 6))
     
-    markers = ['r-o', 'g-s', 'b-^', 'm-d']
+    # We might have more lines now, so expand the markers list
+    markers = ['r-o', 'g-s', 'b-^', 'm-d', 'c-v', 'y-p', 'k-*', 'r--o', 'g--s', 'b--^']
     for idx, target in enumerate(targets):
         times = [results[target][str(q)] for q in common_qubits]
         marker = markers[idx % len(markers)]
-        plt.plot(common_qubits, times, marker, label=f'Target: {target}')
+        # Target format is now typically "target_circuit", e.g., "nvidia_ghz"
+        plt.plot(common_qubits, times, marker, label=f'{target}')
 
     plt.yscale('log')
     plt.xlabel('Qubit Count Volume')
     
-    # Update label based on evolution_only flag
+    # Update label based on metadata flags
     y_label = 'Execution Latency (Seconds)'
-    if metadata.get('evolution_only'):
+    if metadata.get('noise_probability', 0.0) > 0.0:
+        y_label += f" [Noise Prob: {metadata.get('noise_probability')}]"
+    elif metadata.get('evolution_only'):
         y_label += ' [Evolution Only]'
     else:
         y_label += ' [Includes Sampling]'

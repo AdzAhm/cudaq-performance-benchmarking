@@ -7,9 +7,13 @@ FROM nvidia/cuda:12.3.2-runtime-ubuntu22.04
 WORKDIR /app
 
 # Install Python and dependencies in one layer to minimize image size
+# openmpi-bin and libopenmpi-dev added for distributed scaling (nvidia-mqpu)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
+    openmpi-bin \
+    libopenmpi-dev \
+    openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python packages without cache to reduce image bloat

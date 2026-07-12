@@ -8,7 +8,7 @@
 A comparative performance analysis evaluating execution latency scaling across classical CPU execution architectures versus hardware-accelerated GPU pipelines using the **NVIDIA CUDA-Q** framework.
 
 ## Project Overview
-This project benchmarks the performance characteristics of simulating multi-qubit maximally entangled states (GHZ states) under varying hardware backends. 
+This project benchmarks the performance characteristics of simulating multi-qubit states under varying hardware backends. 
 
 **Note:** This project performs *Quantum Emulation* on classical hardware (NVIDIA GPU/x86 CPU). It does not execute on a physical QPU.
 
@@ -32,12 +32,20 @@ cudaq-performance-benchmarking/
 ## Architectural Metrics & Analysis
 The benchmarking suite evaluates state-vector tracking from 4 to 18 qubits using 500 execution shots per scale sequence. To ensure scientific rigor, a JIT-compilation "warm-up" circuit is executed prior to the benchmarking loop to prevent driver initialization overhead from skewing latency metrics.
 
+### Benchmarked Circuits
+The suite now dynamically tests multiple circuit architectures to evaluate workload diversity:
+1. **GHZ State:** A highly entangled sequence acting as a baseline metric.
+2. **Hardware Efficient Ansatz (HEA):** A parameterized circuit heavily used in Variational Quantum Eigensolvers (VQE) and QAOA, consisting of dense single-qubit rotations (`RX`, `RZ`) followed by entangling `CX` layers.
+
 ### Measurement Overhead vs State Vector Evolution
 In a state-vector simulator, calling a sampling function (like `cudaq.sample`) performs two expensive tasks: 
 1. **State Vector Evolution:** Multiplying the state vector by the quantum gates.
 2. **Measurement Overhead:** Collapsing the computed wavefunction into a probability distribution and drawing samples from it.
 
-By default, this suite benchmarks the full sampling pipeline. If your goal is strictly benchmarking the computational limit of simulating gates, you can use the `--evolution-only` flag to isolate the raw matrix multiplication speed using `cudaq.get_state()`.
+By default, this suite benchmarks the full sampling pipeline. If your goal is strictly benchmarking the computational limit of simulating gates, you can use the `--evolution-only` flag to isolate the raw matrix multiplication speed using `cudaq.get_state()`. Note: This flag is incompatible with noise modeling.
+
+### Noise Modeling
+You can introduce a Depolarizing Channel to simulate the decoherence inherent in NISQ devices. Setting `noise_probability: 0.01` (or any positive value) in the `config.yaml` applies noise across all gates. Noise simulation forces density matrix tracking or stochastic sampling, vastly increasing the computational complexity.
 
 ### Performance Artifact
 ![Performance Scaling Analysis](./reports/benchmark_chart.png)
@@ -52,6 +60,7 @@ By default, this suite benchmarks the full sampling pipeline. If your goal is st
 * **Framework:** NVIDIA CUDA-Q
 * **Hardware Acceleration Engine:** NVIDIA T4 GPU (via cuStateVec)
 * **Classical Simulation Target:** qpp-cpu (OpenMP-accelerated host simulator)
+* **Distributed Target:** nvidia-mqpu (MPI-based Multi-GPU orchestration)
 * **Data Pipeline:** JSON Structured Logging / Matplotlib
 
 ---
@@ -59,22 +68,24 @@ By default, this suite benchmarks the full sampling pipeline. If your goal is st
 ## How to Run
 
 ### Option 1: Containerized Deployment (Recommended)
-Avoid local dependency conflicts by running the suite via Docker. Ensure your host system has the NVIDIA Container Toolkit installed. The container securely uses a non-root user and maps permissions automatically.
+Avoid local dependency conflicts by running the suite via Docker. Ensure your host system has the NVIDIA Container Toolkit installed. The container securely uses a non-root user, maps permissions automatically, and pre-installs OpenMPI for multi-GPU scaling.
 
 ```bash
 # 1. Build the image
 docker build -t cudaq-bench .
 
-# 2. Run the benchmarking suite (mounts the data folder to save results locally)
-# The container uses config.yaml by default
+# 2. Run the benchmarking suite standard
 docker run --gpus all -v $(pwd)/data:/app/data -v $(pwd)/reports:/app/reports cudaq-bench
 
-# 3. Generate the visualization locally
+# 3. Distributed Scaling (Multi-GPU via MPI)
+docker run --gpus all -v $(pwd)/data:/app/data -v $(pwd)/reports:/app/reports cudaq-bench mpirun -np 2 python3 benchmarks/hybrid_scaling_test.py
+
+# 4. Generate the visualization locally
 python benchmarks/plot_results.py
 ```
 
 ### Option 2: Local Python Environment
-If running natively, provision an environment with access to an active NVIDIA GPU runtime.
+If running natively, provision an environment with access to an active NVIDIA GPU runtime and OpenMPI.
 
 ```bash
 # 1. Install dependencies
@@ -83,20 +94,12 @@ pip install cudaq matplotlib pyyaml
 # 2. Execute the core benchmarking pipeline using config.yaml defaults
 python benchmarks/hybrid_scaling_test.py 
 
-# 3. (Optional) Override config defaults using CLI arguments
-python benchmarks/hybrid_scaling_test.py --min-qubits 4 --max-qubits 16 --step 2 --shots 500
+# 3. (Optional) Run with MPI for Multi-GPU distribution
+mpirun -np 2 python benchmarks/hybrid_scaling_test.py
 
-# 4. (Optional) Benchmark State Vector Evolution only (No Measurement)
-python benchmarks/hybrid_scaling_test.py --evolution-only
-
-# 5. Generate the performance graph
+# 4. Generate the performance graph
 python benchmarks/plot_results.py
 ```
-
-## Future Work
-- **Noise Modeling:** Implement cudaq.NoiseModel to benchmark the performance hit of simulating decoherence.
-- **Circuit Diversity:** Expand beyond GHZ states to include Random Quantum Circuits (RQCs) and QAOA.
-- **Distributed Scaling (MPI / Multi-GPU):** To scale beyond the ~30 qubit barrier where a single GPU's VRAM is exhausted, transition to distributed state vectors using `cudaq.set_target("nvidia-mqpu")` and execute the container using `mpirun`.
 
 ## License
 Distributed under the MIT License. See LICENSE for more information.
