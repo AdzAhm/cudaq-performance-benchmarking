@@ -30,7 +30,7 @@ cudaq-performance-benchmarking/
 ```
 
 ## Architectural Metrics & Analysis
-The benchmarking suite evaluates state-vector tracking from 4 to 16 qubits using 500 execution shots per scale sequence. To ensure scientific rigor, a JIT-compilation "warm-up" circuit is executed prior to the benchmarking loop to prevent driver initialization overhead from skewing latency metrics.
+The benchmarking suite evaluates state-vector tracking from 4 to 18 qubits using 500 execution shots per scale sequence. To ensure scientific rigor, a JIT-compilation "warm-up" circuit is executed prior to the benchmarking loop to prevent driver initialization overhead from skewing latency metrics.
 
 ### Measurement Overhead vs State Vector Evolution
 In a state-vector simulator, calling a sampling function (like `cudaq.sample`) performs two expensive tasks: 
@@ -46,7 +46,7 @@ By default, this suite benchmarks the full sampling pipeline. If your goal is st
 1. **The Initialization Tax:** At a low qubit volume (N=4), the classical CPU engine outperforms the GPU pipeline. This highlights the memory allocation, kernel JIT compilation, and PCIe bus transfer overhead native to heterogeneous computing.
 2. **The Efficiency Crossover:** Between 8 and 10 qubits, the computational density amortizes the initialization latency, making GPU acceleration highly efficient.
 3. **Exponential Classical Degradation:** Beyond 12 qubits, the CPU execution latency scales vertically due to the exponential growth of the underlying complex state vectors.
-4. **Massive Parallel Throughput:** The NVIDIA GPU pipeline maintains near-flat execution latency up to 16 qubits, leveraging dense thread arrays to compute matrix transformations simultaneously without hitting VRAM bottlenecks.
+4. **Massive Parallel Throughput:** The NVIDIA GPU pipeline maintains near-flat execution latency up to 18 qubits, leveraging dense thread arrays to compute matrix transformations simultaneously without hitting VRAM bottlenecks.
 
 ## Technical Toolchain
 * **Framework:** NVIDIA CUDA-Q

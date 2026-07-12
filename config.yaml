@@ -1,6 +1,6 @@
 benchmarks:
   min_qubits: 4
-  max_qubits: 16
+  max_qubits: 18
   step: 2
   shots: 500
   targets:
