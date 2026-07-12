@@ -47,8 +47,12 @@ By default, this suite benchmarks the full sampling pipeline. If your goal is st
 ### Noise Modeling
 You can introduce a Depolarizing Channel to simulate the decoherence inherent in NISQ devices. Setting `noise_probability: 0.01` (or any positive value) in the `config.yaml` applies noise across all gates. Noise simulation forces density matrix tracking or stochastic sampling, vastly increasing the computational complexity.
 
-### Performance Artifact
-![Performance Scaling Analysis](./reports/benchmark_chart.png)
+### Performance Artifacts
+**GHZ Circuit Scaling**
+![Performance Scaling Analysis - GHZ](./reports/benchmark_chart_ghz.png)
+
+**HEA Circuit Scaling**
+![Performance Scaling Analysis - HEA](./reports/benchmark_chart_hea.png)
 
 ### Key Observations
 1. **The Initialization Tax:** At a low qubit volume (N=4), the classical CPU engine outperforms the GPU pipeline. This highlights the memory allocation, kernel JIT compilation, and PCIe bus transfer overhead native to heterogeneous computing.
