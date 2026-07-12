@@ -24,11 +24,20 @@ cudaq-performance-benchmarking/
 ├── reports/
 │   └── benchmark_chart.png      # Generated log-scale performance artifact
 ├── Dockerfile                   # Environment provisioning (NVIDIA base image)
+├── config.yaml                  # Configuration file for benchmarking tests
 ├── LICENSE
 └── README.md
 ```
+
 ## Architectural Metrics & Analysis
 The benchmarking suite evaluates state-vector tracking from 4 to 16 qubits using 500 execution shots per scale sequence. To ensure scientific rigor, a JIT-compilation "warm-up" circuit is executed prior to the benchmarking loop to prevent driver initialization overhead from skewing latency metrics.
+
+### Measurement Overhead vs State Vector Evolution
+In a state-vector simulator, calling a sampling function (like `cudaq.sample`) performs two expensive tasks: 
+1. **State Vector Evolution:** Multiplying the state vector by the quantum gates.
+2. **Measurement Overhead:** Collapsing the computed wavefunction into a probability distribution and drawing samples from it.
+
+By default, this suite benchmarks the full sampling pipeline. If your goal is strictly benchmarking the computational limit of simulating gates, you can use the `--evolution-only` flag to isolate the raw matrix multiplication speed using `cudaq.get_state()`.
 
 ### Performance Artifact
 ![Performance Scaling Analysis](./reports/benchmark_chart.png)
@@ -50,14 +59,15 @@ The benchmarking suite evaluates state-vector tracking from 4 to 16 qubits using
 ## How to Run
 
 ### Option 1: Containerized Deployment (Recommended)
-Avoid local dependency conflicts by running the suite via the official NVIDIA CUDA-Q Docker image. Ensure your host system has the NVIDIA Container Toolkit installed.
+Avoid local dependency conflicts by running the suite via Docker. Ensure your host system has the NVIDIA Container Toolkit installed. The container securely uses a non-root user and maps permissions automatically.
 
 ```bash
 # 1. Build the image
 docker build -t cudaq-bench .
 
 # 2. Run the benchmarking suite (mounts the data folder to save results locally)
-docker run --gpus all -v $(pwd)/data:/app/data cudaq-bench
+# The container uses config.yaml by default
+docker run --gpus all -v $(pwd)/data:/app/data -v $(pwd)/reports:/app/reports cudaq-bench
 
 # 3. Generate the visualization locally
 python benchmarks/plot_results.py
@@ -65,22 +75,28 @@ python benchmarks/plot_results.py
 
 ### Option 2: Local Python Environment
 If running natively, provision an environment with access to an active NVIDIA GPU runtime.
-'''
+
 ```bash
 # 1. Install dependencies
-pip install cudaq matplotlib
+pip install cudaq matplotlib pyyaml
 
-# 2. Execute the core benchmarking pipeline (supports dynamic CLI arguments)
+# 2. Execute the core benchmarking pipeline using config.yaml defaults
+python benchmarks/hybrid_scaling_test.py 
+
+# 3. (Optional) Override config defaults using CLI arguments
 python benchmarks/hybrid_scaling_test.py --min-qubits 4 --max-qubits 16 --step 2 --shots 500
 
-# 3. Generate the performance graph
+# 4. (Optional) Benchmark State Vector Evolution only (No Measurement)
+python benchmarks/hybrid_scaling_test.py --evolution-only
+
+# 5. Generate the performance graph
 python benchmarks/plot_results.py
 ```
 
 ## Future Work
 - **Noise Modeling:** Implement cudaq.NoiseModel to benchmark the performance hit of simulating decoherence.
 - **Circuit Diversity:** Expand beyond GHZ states to include Random Quantum Circuits (RQCs) and QAOA.
-- **Distributed Scaling:** Extend the suite to support multi-GPU MPI-based orchestration.
+- **Distributed Scaling (MPI / Multi-GPU):** To scale beyond the ~30 qubit barrier where a single GPU's VRAM is exhausted, transition to distributed state vectors using `cudaq.set_target("nvidia-mqpu")` and execute the container using `mpirun`.
 
 ## License
 Distributed under the MIT License. See LICENSE for more information.
