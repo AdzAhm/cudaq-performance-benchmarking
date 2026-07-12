@@ -50,6 +50,15 @@ You can introduce a Depolarizing Channel to simulate the decoherence inherent in
 ### Interactive Streamlit Dashboard
 Instead of generating static PNG charts, this suite now features a fully interactive web dashboard built with **Streamlit**. You can dynamically filter targets, select quantum circuits, and visualize performance bottlenecks right in your browser.
 
+### Performance Artifacts (Static)
+While the web dashboard provides the best experience, the static charts generated from the baseline precision are included below:
+
+**GHZ Circuit Scaling**
+![Performance Scaling Analysis - GHZ](./reports/benchmark_chart_ghz.png)
+
+**HEA Circuit Scaling**
+![Performance Scaling Analysis - HEA](./reports/benchmark_chart_hea.png)
+
 ### Precision Scaling (`float32` vs `float64`)
 By default, CUDA-Q and the benchmark suite execute with **Double Precision (`float64`)**. You can configure the suite to evaluate **Single Precision (`float32`)** by changing the `precision` key in `config.yaml`. Single precision cuts the memory bandwidth and footprint in half, which drastically alters the GPU scaling curve and delays the VRAM saturation point for extremely large qubit counts.
 
