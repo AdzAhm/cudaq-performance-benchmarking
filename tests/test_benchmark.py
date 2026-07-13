@@ -12,8 +12,6 @@ matplotlib.use("Agg")
 import json
 import os
 import sys
-import tempfile
-import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
@@ -232,7 +230,6 @@ class TestNoiseModelScope:
         """The noise model construction logic should add channels for every qubit index."""
         # Simulate the noise model construction logic from hybrid_scaling_test.py
         max_qubits = 8
-        noise_prob = 0.01
         channels_added = []
 
         # Replicate the fixed loop from hybrid_scaling_test.py

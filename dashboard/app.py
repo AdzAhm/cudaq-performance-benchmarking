@@ -3,7 +3,6 @@ import json
 import os
 import glob
 from pathlib import Path
-import pandas as pd
 import matplotlib.pyplot as plt
 
 # Page config

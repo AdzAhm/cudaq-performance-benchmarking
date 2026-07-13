@@ -1,3 +1,4 @@
+# ruff: noqa: F821
 import time
 import json
 import os
