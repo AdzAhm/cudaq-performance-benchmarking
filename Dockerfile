@@ -1,7 +1,7 @@
 # NVIDIA CUDA-Q Benchmark Container
 # Best practices: official NVIDIA base image, minimal layers, non-root user
 
-FROM nvidia/cuda:12.3.2-runtime-ubuntu22.04
+FROM nvidia/cuda:12.6.2-runtime-ubuntu24.04
 
 # Set working directory
 WORKDIR /app
@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt /app/requirements.txt
 
 # Install Python packages from requirements.txt without cache to reduce image bloat
-RUN python3 -m pip install --no-cache-dir -r requirements.txt
+RUN python3 -m pip install --no-cache-dir --break-system-packages -r requirements.txt
 
 # Create non-root user for security best practices
 RUN useradd -m -u 1000 benchmark_user
