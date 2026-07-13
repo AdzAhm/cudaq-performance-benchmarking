@@ -2,6 +2,7 @@ import time
 import json
 import os
 import argparse
+import statistics
 import yaml
 import cudaq
 from cudaq import h, cx, rx, rz
@@ -14,7 +15,7 @@ def ghz_circuit(qubit_count: int):
     for i in range(1, qubit_count):
         cx(q[i - 1], q[i])
 
-# 2. Hardware Efficient Ansatz (HEA) placeholder
+# 2. Hardware Efficient Ansatz (HEA)
 @cudaq.kernel
 def hea_circuit(qubit_count: int):
     q = cudaq.qvector(qubit_count)
@@ -26,7 +27,7 @@ def hea_circuit(qubit_count: int):
     for i in range(qubit_count - 1):
         cx(q[i], q[i + 1])
 
-def run_benchmark(target: str, circuit_name: str, min_q: int, max_q: int, step: int, shots: int, evolution_only: bool, noise_model=None):
+def run_benchmark(target: str, circuit_name: str, min_q: int, max_q: int, step: int, shots: int, num_trials: int, evolution_only: bool, noise_model=None):
     cudaq.set_target(target)
     
     # Select circuit
@@ -46,20 +47,33 @@ def run_benchmark(target: str, circuit_name: str, min_q: int, max_q: int, step: 
     latencies = {}
     for n in range(min_q, max_q + 1, step):
         if rank == 0:
-            print(f"Running target [{target}] on [{circuit_name}] at scale: {n} qubits...")
-            
-        t_start = time.perf_counter()
+            print(f"Running target [{target}] on [{circuit_name}] at scale: {n} qubits ({num_trials} trials)...")
         
-        if evolution_only and noise_model is None:
-            _ = cudaq.get_state(kernel, n)
-        else:
-            if noise_model is not None:
-                _ = cudaq.sample(kernel, n, shots_count=shots, noise_model=noise_model)
+        trial_times = []
+        for trial in range(num_trials):
+            t_start = time.perf_counter()
+            
+            if evolution_only and noise_model is None:
+                _ = cudaq.get_state(kernel, n)
             else:
-                _ = cudaq.sample(kernel, n, shots_count=shots)
-                
-        elapsed = time.perf_counter() - t_start
-        latencies[n] = elapsed
+                if noise_model is not None:
+                    _ = cudaq.sample(kernel, n, shots_count=shots, noise_model=noise_model)
+                else:
+                    _ = cudaq.sample(kernel, n, shots_count=shots)
+                    
+            elapsed = time.perf_counter() - t_start
+            trial_times.append(elapsed)
+
+        mean_time = statistics.mean(trial_times)
+        std_time = statistics.stdev(trial_times) if num_trials > 1 else 0.0
+        min_time = min(trial_times)
+
+        latencies[n] = {
+            "mean": mean_time,
+            "std": std_time,
+            "min": min_time,
+            "raw": trial_times
+        }
         
     return latencies
 
@@ -76,6 +90,7 @@ if __name__ == "__main__":
     parser.add_argument("--max-qubits", type=int, help="Maximum qubit count")
     parser.add_argument("--step", type=int, help="Step size")
     parser.add_argument("--shots", type=int, help="Measurement shots per trial")
+    parser.add_argument("--num-trials", type=int, help="Number of trials per qubit count")
     parser.add_argument("--precision", type=str, choices=["float32", "float64"], help="Simulation precision")
     parser.add_argument("--evolution-only", action='store_true', help="Benchmark state vector evolution only")
     parser.add_argument("--output", type=str, help="Path to save results")
@@ -87,12 +102,17 @@ if __name__ == "__main__":
     max_qubits = args.max_qubits if args.max_qubits is not None else config.get('max_qubits', 16)
     step = args.step if args.step is not None else config.get('step', 2)
     shots = args.shots if args.shots is not None else config.get('shots', 500)
+    num_trials = args.num_trials if args.num_trials is not None else config.get('num_trials', 3)
     evolution_only = args.evolution_only or config.get('evolution_only', False)
-    output_path = args.output if args.output is not None else config.get('output_file', "data/benchmark_results.json")
     targets = config.get('targets', ["qpp-cpu", "nvidia"])
     circuits = config.get('circuits', ["ghz"])
     noise_prob = config.get('noise_probability', 0.0)
     precision = args.precision if args.precision else config.get('precision', "float64")
+
+    # Auto-append precision to output filename to prevent overwrites
+    output_base = args.output if args.output is not None else config.get('output_file', "data/benchmark_results.json")
+    base, ext = os.path.splitext(output_base)
+    output_path = f"{base}_{precision}{ext}"
 
     # Inform the user about precision limitations in pure Python environment
     if precision == "float32":
@@ -101,14 +121,17 @@ if __name__ == "__main__":
     # MPI Rank logic
     rank = cudaq.mpi.rank() if cudaq.mpi.is_initialized() else 0
 
+    # Build noise model applying depolarization to ALL qubit indices
     noise_model = None
     if noise_prob > 0.0:
         noise_model = cudaq.NoiseModel()
         depolarizing_channel = cudaq.DepolarizationChannel(noise_prob)
-        noise_model.add_channel('rx', [0], depolarizing_channel)
-        noise_model.add_channel('rz', [0], depolarizing_channel)
-        noise_model.add_channel('cx', [0, 1], depolarizing_channel)
-        noise_model.add_channel('h', [0], depolarizing_channel)
+        for i in range(max_qubits):
+            noise_model.add_channel('rx', [i], depolarizing_channel)
+            noise_model.add_channel('rz', [i], depolarizing_channel)
+            noise_model.add_channel('h', [i], depolarizing_channel)
+        for i in range(max_qubits - 1):
+            noise_model.add_channel('cx', [i, i + 1], depolarizing_channel)
 
     if rank == 0:
         print("Starting execution tracking...")
@@ -117,6 +140,7 @@ if __name__ == "__main__":
         else:
             print(f"Mode: {'Evolution Only (get_state)' if evolution_only else 'Full Sampling (sample)'}")
         print(f"Precision configured to: {precision}")
+        print(f"Trials per qubit count: {num_trials}")
     
     all_results = {}
     for target in targets:
@@ -124,7 +148,7 @@ if __name__ == "__main__":
             # We use a combined key for the JSON results
             key = f"{target}_{circuit}"
             try:
-                all_results[key] = run_benchmark(target, circuit, min_qubits, max_qubits, step, shots, evolution_only, noise_model)
+                all_results[key] = run_benchmark(target, circuit, min_qubits, max_qubits, step, shots, num_trials, evolution_only, noise_model)
             except Exception as e:
                 if rank == 0:
                     print(f"Skipping {key} due to error: {e}")
@@ -134,6 +158,7 @@ if __name__ == "__main__":
         output_payload = {
             "metadata": {
                 "shots": shots, 
+                "num_trials": num_trials,
                 "evolution_only": evolution_only,
                 "noise_probability": noise_prob,
                 "precision": precision,

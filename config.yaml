@@ -3,6 +3,7 @@ benchmarks:
   max_qubits: 18
   step: 2
   shots: 500
+  num_trials: 3
   targets:
     - qpp-cpu
     - nvidia

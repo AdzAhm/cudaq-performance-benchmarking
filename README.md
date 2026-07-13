@@ -4,6 +4,7 @@
 ![NVIDIA CUDA-Q](https://img.shields.io/badge/NVIDIA-CUDA--Q-76B900)
 ![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![CI](https://github.com/AdzAhm/cudaq-performance-benchmarking/actions/workflows/ci.yml/badge.svg)
 
 A comparative performance analysis evaluating execution latency scaling across classical CPU execution architectures versus hardware-accelerated GPU pipelines using the **NVIDIA CUDA-Q** framework.
 
@@ -19,18 +20,25 @@ cudaq-performance-benchmarking/
 ├── benchmarks/
 │   ├── hybrid_scaling_test.py   # Core CLI execution and JSON data logging
 │   └── plot_results.py          # Decoupled visualization generation
+├── dashboard/
+│   └── app.py                   # Interactive Streamlit web dashboard
 ├── data/
-│   └── benchmark_results.json   # Structured output from simulation runs
+│   └── benchmark_results_*.json # Structured output from simulation runs
 ├── reports/
-│   └── benchmark_chart.png      # Generated log-scale performance artifact
+│   └── benchmark_chart_*.png    # Generated log-scale performance artifacts
+├── tests/
+│   └── test_benchmark.py        # Unit tests (CPU-only, no GPU required)
+├── .github/
+│   └── workflows/ci.yml         # GitHub Actions CI pipeline
 ├── Dockerfile                   # Environment provisioning (NVIDIA base image)
 ├── config.yaml                  # Configuration file for benchmarking tests
+├── requirements.txt             # Python dependency specification
 ├── LICENSE
 └── README.md
 ```
 
 ## Architectural Metrics & Analysis
-The benchmarking suite evaluates state-vector tracking from 4 to 18 qubits using 500 execution shots per scale sequence. To ensure scientific rigor, a JIT-compilation "warm-up" circuit is executed prior to the benchmarking loop to prevent driver initialization overhead from skewing latency metrics.
+The benchmarking suite evaluates state-vector tracking from 4 to 18 qubits using 500 execution shots per scale sequence. Each qubit count is benchmarked over **multiple independent trials** (configurable via `num_trials`, default: 3), recording the mean, standard deviation, and minimum latency for statistical rigor. To ensure scientific accuracy, a JIT-compilation "warm-up" circuit is executed prior to the benchmarking loop to prevent driver initialization overhead from skewing latency metrics.
 
 ### Benchmarked Circuits
 The suite now dynamically tests multiple circuit architectures to evaluate workload diversity:
@@ -45,10 +53,10 @@ In a state-vector simulator, calling a sampling function (like `cudaq.sample`) p
 By default, this suite benchmarks the full sampling pipeline. If your goal is strictly benchmarking the computational limit of simulating gates, you can use the `--evolution-only` flag to isolate the raw matrix multiplication speed using `cudaq.get_state()`. Note: This flag is incompatible with noise modeling.
 
 ### Noise Modeling
-You can introduce a Depolarizing Channel to simulate the decoherence inherent in NISQ devices. Setting `noise_probability: 0.01` (or any positive value) in the `config.yaml` applies noise across all gates. Noise simulation forces density matrix tracking or stochastic sampling, vastly increasing the computational complexity.
+You can introduce a Depolarizing Channel to simulate the decoherence inherent in NISQ devices. Setting `noise_probability: 0.01` (or any positive value) in the `config.yaml` applies depolarization noise to **every gate on every qubit** in the circuit — all single-qubit gates (`RX`, `RZ`, `H`) across all indices and all two-qubit `CX` gates across all adjacent pairs. Noise simulation forces density matrix tracking or stochastic sampling, vastly increasing the computational complexity.
 
 ### Interactive Streamlit Dashboard
-Instead of generating static PNG charts, this suite now features a fully interactive web dashboard built with **Streamlit**. You can dynamically filter targets, select quantum circuits, and visualize performance bottlenecks right in your browser.
+Instead of generating static PNG charts, this suite now features a fully interactive web dashboard built with **Streamlit**. You can dynamically filter targets, select quantum circuits, and visualize performance bottlenecks right in your browser. The dashboard automatically handles both legacy single-value data and the newer multi-trial statistical format.
 
 ### Performance Artifacts (Static)
 While the web dashboard provides the best experience, the static charts generated from the baseline precision are included below:
@@ -62,6 +70,8 @@ While the web dashboard provides the best experience, the static charts generate
 ### Precision Scaling (`float32` vs `float64`)
 By default, CUDA-Q and the benchmark suite execute with **Double Precision (`float64`)**. You can configure the suite to evaluate **Single Precision (`float32`)** by changing the `precision` key in `config.yaml`. Single precision cuts the memory bandwidth and footprint in half, which drastically alters the GPU scaling curve and delays the VRAM saturation point for extremely large qubit counts.
 
+Output filenames are automatically suffixed with the precision (e.g., `benchmark_results_float64.json`) to prevent data from being overwritten when running multiple precision configurations.
+
 ### Key Observations
 1. **The Initialization Tax:** At a low qubit volume (N=4), the classical CPU engine outperforms the GPU pipeline. This highlights the memory allocation, kernel JIT compilation, and PCIe bus transfer overhead native to heterogeneous computing.
 2. **The Efficiency Crossover:** Between 8 and 10 qubits, the computational density amortizes the initialization latency, making GPU acceleration highly efficient.
@@ -74,6 +84,26 @@ By default, CUDA-Q and the benchmark suite execute with **Double Precision (`flo
 * **Classical Simulation Target:** qpp-cpu (OpenMP-accelerated host simulator)
 * **Distributed Target:** nvidia-mqpu (MPI-based Multi-GPU orchestration)
 * **Data Pipeline:** JSON Structured Logging / Matplotlib
+* **CI/CD:** GitHub Actions (lint, test, Docker build)
+
+---
+
+## Configuration Reference
+
+All parameters can be set in `config.yaml` and overridden via CLI flags:
+
+| Parameter | Config Key | CLI Flag | Default | Description |
+|---|---|---|---|---|
+| Min Qubits | `min_qubits` | `--min-qubits` | 4 | Starting qubit count |
+| Max Qubits | `max_qubits` | `--max-qubits` | 16 | Ending qubit count |
+| Step | `step` | `--step` | 2 | Qubit count increment |
+| Shots | `shots` | `--shots` | 500 | Measurement shots per trial |
+| Trials | `num_trials` | `--num-trials` | 3 | Independent trials per qubit count |
+| Precision | `precision` | `--precision` | float64 | Simulation precision (float32/float64) |
+| Evolution Only | `evolution_only` | `--evolution-only` | false | Benchmark state vector evolution only |
+| Noise Probability | `noise_probability` | — | 0.0 | Depolarizing channel probability |
+| Targets | `targets` | — | [qpp-cpu, nvidia] | Simulation backends to benchmark |
+| Circuits | `circuits` | — | [ghz] | Circuit architectures to test |
 
 ---
 
@@ -101,7 +131,7 @@ If running natively, provision an environment with access to an active NVIDIA GP
 
 ```bash
 # 1. Install dependencies
-pip install cudaq matplotlib pyyaml
+pip install -r requirements.txt
 
 # 2. Execute the core benchmarking pipeline using config.yaml defaults
 python benchmarks/hybrid_scaling_test.py 
@@ -111,6 +141,9 @@ mpirun -np 2 python benchmarks/hybrid_scaling_test.py
 
 # 4. Generate the performance graph
 python benchmarks/plot_results.py
+
+# 5. Run the unit tests
+pytest tests/ -v
 ```
 
 ## License

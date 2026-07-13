@@ -16,14 +16,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python packages without cache to reduce image bloat
-# PyYAML is added for the new configuration file. Streamlit added for Dashboard.
-RUN python3 -m pip install --no-cache-dir \
-    cudaq \
-    matplotlib \
-    pyyaml \
-    streamlit \
-    pandas
+# Copy requirements first for better Docker layer caching
+COPY requirements.txt /app/requirements.txt
+
+# Install Python packages from requirements.txt without cache to reduce image bloat
+RUN python3 -m pip install --no-cache-dir -r requirements.txt
 
 # Create non-root user for security best practices
 RUN useradd -m -u 1000 benchmark_user
