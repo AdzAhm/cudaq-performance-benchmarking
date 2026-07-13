@@ -62,10 +62,10 @@ Instead of generating static PNG charts, this suite now features a fully interac
 While the web dashboard provides the best experience, the static charts generated from the baseline precision are included below:
 
 **GHZ Circuit Scaling**
-![Performance Scaling Analysis - GHZ](./reports/benchmark_chart_ghz.png)
+![Performance Scaling Analysis - GHZ](./reports/benchmark_chart_ghz_float64.png)
 
 **HEA Circuit Scaling**
-![Performance Scaling Analysis - HEA](./reports/benchmark_chart_hea.png)
+![Performance Scaling Analysis - HEA](./reports/benchmark_chart_hea_float64.png)
 
 ### Precision Scaling (`float32` vs `float64`)
 By default, CUDA-Q and the benchmark suite execute with **Double Precision (`float64`)**. You can configure the suite to evaluate **Single Precision (`float32`)** by changing the `precision` key in `config.yaml`. Single precision cuts the memory bandwidth and footprint in half, which drastically alters the GPU scaling curve and delays the VRAM saturation point for extremely large qubit counts.
