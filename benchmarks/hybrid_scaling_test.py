@@ -5,7 +5,6 @@ import argparse
 import statistics
 import yaml
 import cudaq
-from cudaq import h, cx, rx, rz
 
 # 1. GHZ Circuit
 @cudaq.kernel
