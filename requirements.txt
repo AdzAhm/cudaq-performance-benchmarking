@@ -1,0 +1,5 @@
+cudaq
+matplotlib>=3.7
+pyyaml>=6.0
+streamlit>=1.28
+pandas>=2.0
