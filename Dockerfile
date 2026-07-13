@@ -23,7 +23,7 @@ COPY requirements.txt /app/requirements.txt
 RUN python3 -m pip install --no-cache-dir --break-system-packages -r requirements.txt
 
 # Create non-root user for security best practices
-RUN useradd -m -u 1000 benchmark_user
+RUN useradd -m benchmark_user
 
 # Explicitly create directories with correct ownership before copying
 RUN mkdir -p /app/data /app/reports /app/dashboard && chown -R benchmark_user:benchmark_user /app
