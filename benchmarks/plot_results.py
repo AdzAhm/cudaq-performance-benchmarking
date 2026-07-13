@@ -33,7 +33,16 @@ def main():
     output_dir = base_dir / args.output_dir if not os.path.isabs(args.output_dir) else Path(args.output_dir)
 
     if not input_path.exists():
-        raise FileNotFoundError(f"Input file not found at: {input_path}")
+        import glob
+        # Try to find the most recent benchmark_results_*.json
+        search_pattern = str(base_dir / "data" / "benchmark_results_*.json")
+        matches = glob.glob(search_pattern)
+        if matches:
+            latest_file = max(matches, key=os.path.getmtime)
+            input_path = Path(latest_file)
+            print(f"[INFO] Default input not found. Using most recent file: {input_path}")
+        else:
+            raise FileNotFoundError(f"Input file not found at: {args.input} and no alternatives found in data/")
 
     with open(input_path, "r") as f:
         data = json.load(f)

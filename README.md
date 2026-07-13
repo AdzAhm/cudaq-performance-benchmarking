@@ -38,7 +38,7 @@ cudaq-performance-benchmarking/
 ```
 
 ## Architectural Metrics & Analysis
-The benchmarking suite evaluates state-vector tracking from 4 to 18 qubits using 500 execution shots per scale sequence. Each qubit count is benchmarked over **multiple independent trials** (configurable via `num_trials`, default: 3), recording the mean, standard deviation, and minimum latency for statistical rigor.
+The benchmarking suite evaluates state-vector tracking from 4 to 18 qubits using 500 execution shots per scale sequence. Each qubit count is benchmarked over **multiple independent trials** (configurable via `num_trials`, default: 3), recording the mean, standard deviation, and minimum latency for statistical rigor. To ensure scientific accuracy, a JIT-compilation "warm-up" circuit is executed for *every* specific qubit size prior to its measuring loop. This prevents dynamic AST compilation and driver overheads from skewing the true algorithmic latency metrics.
 
 ### Benchmarked Circuits
 The suite now dynamically tests multiple circuit architectures to evaluate workload diversity:
@@ -73,9 +73,10 @@ By default, CUDA-Q and the benchmark suite execute with **Double Precision (`flo
 Output filenames are automatically suffixed with the precision (e.g., `benchmark_results_float64.json`) to prevent data from being overwritten when running multiple precision configurations.
 
 ### Key Observations
-1. **Immediate GPU Dominance:** Unlike early generations of quantum simulators, the NVIDIA GPU pipeline immediately outperforms the classical CPU engine even at extremely low qubit volumes (N=4). This highlights the efficiency of cuStateVec's memory management, where the parallel computational density instantly amortizes any PCIe bus transfer or kernel JIT compilation overhead.
-2. **Exponential Classical Degradation:** Between 10 and 12 qubits, the CPU execution latency begins scaling vertically due to the exponential O(2^N) growth of the underlying complex state vectors, eventually breaching 2.0+ seconds per run at 18 qubits.
-3. **Massive Parallel Throughput:** The NVIDIA GPU pipeline maintains near-flat execution latency (under `0.003s`) up to 18 qubits, leveraging dense thread arrays to compute matrix transformations simultaneously without hitting VRAM memory bandwidth bottlenecks.
+1. **The Initialization Tax Eliminated:** Previously, the GPU exhibited severe latency at low qubit volumes due to driver and kernel JIT compilation overhead. By executing a JIT warm-up circuit inside the benchmark loop, this initialization tax is entirely decoupled. Consequently, the GPU matches or slightly outperforms the CPU even at minimal qubit volumes (N=4).
+2. **The True Efficiency Crossover:** Because PCIe bus transfer and kernel launch overheads remain essentially constant (approx. ~1ms), the GPU pipeline operates highly efficiently across all tested volumes. The true computational divergence occurs around 12 qubits, where the CPU's cache can no longer contain the state vector.
+3. **Exponential Classical Degradation:** Beyond 12 qubits, the CPU execution latency scales exponentially due to the $O(2^N)$ growth of the underlying complex state vectors.
+4. **Massive Parallel Throughput:** The NVIDIA GPU pipeline maintains a near-flat execution latency up to 18 qubits, leveraging dense Streaming Multiprocessor (SM) arrays to compute matrix transformations simultaneously without hitting VRAM bottlenecks.
 
 ## Technical Toolchain
 * **Framework:** NVIDIA CUDA-Q

@@ -34,19 +34,22 @@ def run_benchmark(target: str, circuit_name: str, min_q: int, max_q: int, step: 
 
     rank = cudaq.mpi.rank() if cudaq.mpi.is_initialized() else 0
     
-    # --- WARM-UP ROUND ---
-    if evolution_only and noise_model is None:
-        cudaq.get_state(kernel, min_q)
-    else:
-        if noise_model is not None:
-            cudaq.sample(kernel, min_q, shots_count=10, noise_model=noise_model)
-        else:
-            cudaq.sample(kernel, min_q, shots_count=10)
-    
     latencies = {}
     for n in range(min_q, max_q + 1, step):
         if rank == 0:
             print(f"Running target [{target}] on [{circuit_name}] at scale: {n} qubits ({num_trials} trials)...")
+            
+        # --- JIT WARM-UP ROUND ---
+        # Warmed up specifically for 'n' to ensure the JIT compilation time 
+        # is decoupled from the actual measured execution latency.
+        if evolution_only and noise_model is None:
+            _ = cudaq.get_state(kernel, n)
+        else:
+            if noise_model is not None:
+                _ = cudaq.sample(kernel, n, shots_count=10, noise_model=noise_model)
+            else:
+                _ = cudaq.sample(kernel, n, shots_count=10)
+
         
         trial_times = []
         for trial in range(num_trials):
